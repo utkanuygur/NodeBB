@@ -52,7 +52,10 @@ module.exports = function (Groups) {
     };
     Groups.updateCover = function (uid, data) {
         return __awaiter(this, void 0, void 0, function* () {
-            let tempPath = data.file ? data.file.path : '';
+            if (!data || !data.groupName) {
+                throw new Error('[[error:invalid-data]]');
+            }
+            let tempPath = '';
             try {
                 if (!data.imageData && !data.file && data.position) {
                     return yield Groups.updateCoverPosition(data.groupName, data.position);
@@ -61,49 +64,63 @@ module.exports = function (Groups) {
                 if (!type || !allowedTypes.includes(type)) {
                     throw new Error('[[error:invalid-image]]');
                 }
-                if (!tempPath) {
+                if (data.file) {
+                    tempPath = data.file.path;
+                }
+                else {
                     tempPath = yield image.writeImageDataToTempFile(data.imageData);
+                }
+                if (!tempPath || !path_1.default.isAbsolute(tempPath)) {
+                    throw new Error('[[error:invalid-path]]');
                 }
                 const filename = `groupCover-${data.groupName}${path_1.default.extname(tempPath)}`;
                 const uploadData = yield image.uploadImage(filename, 'files', {
                     path: tempPath,
-                    uid: uid,
+                    uid,
                     name: 'groupCover',
                 });
-                const { url } = uploadData;
-                yield Groups.setGroupField(data.groupName, 'cover:url', url);
+                yield Groups.setGroupField(data.groupName, 'cover:url', uploadData.url);
                 yield image.resizeImage({
                     path: tempPath,
                     width: 358,
                 });
                 const thumbUploadData = yield image.uploadImage(`groupCoverThumb-${data.groupName}${path_1.default.extname(tempPath)}`, 'files', {
                     path: tempPath,
-                    uid: uid,
+                    uid,
                     name: 'groupCover',
                 });
                 yield Groups.setGroupField(data.groupName, 'cover:thumb:url', thumbUploadData.url);
                 if (data.position) {
                     yield Groups.updateCoverPosition(data.groupName, data.position);
                 }
-                return { url: url };
+                return { url: uploadData.url };
+            }
+            catch (error) {
+                throw error;
             }
             finally {
-                file.delete(tempPath);
+                if (tempPath) {
+                    yield file.delete(tempPath).catch(e => console.error('Failed to delete temp file:', e));
+                }
             }
         });
     };
     Groups.removeCover = function (data) {
         return __awaiter(this, void 0, void 0, function* () {
+            if (!data || !data.groupName) {
+                throw new Error('[[error:invalid-data]]');
+            }
             const fields = ['cover:url', 'cover:thumb:url'];
             const values = yield Groups.getGroupFields(data.groupName, fields);
-            yield Promise.all(fields.map((field) => {
-                if (!values[field] || !values[field].startsWith(`${nconf_1.default.get('relative_path')}/assets/uploads/files/`)) {
-                    return;
+            const deletePromises = fields.map((field) => __awaiter(this, void 0, void 0, function* () {
+                const fieldValue = values[field];
+                if (fieldValue && fieldValue.startsWith(`${nconf_1.default.get('relative_path')}/assets/uploads/files/`)) {
+                    const filename = fieldValue.split('/').pop();
+                    const filePath = path_1.default.join(nconf_1.default.get('upload_path'), 'files', filename);
+                    yield file.delete(filePath).catch(e => console.error('Failed to delete file:', e));
                 }
-                const filename = values[field].split('/').pop();
-                const filePath = path_1.default.join(nconf_1.default.get('upload_path'), 'files', filename);
-                return file.delete(filePath);
             }));
+            yield Promise.all(deletePromises);
             yield db.deleteObjectFields(`group:${data.groupName}`, ['cover:url', 'cover:thumb:url', 'cover:position']);
         });
     };
