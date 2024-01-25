@@ -1,105 +1,104 @@
-import path from 'path';
-import nconf from 'nconf';
-import db from '../database';
-import image from '../image';
-import file from '../file';
+'use strict';
+
+import * as path from 'path';
+import * as nconf from 'nconf';
+import * as db from '../database';
+import * as image from '../image';
+import * as file from '../file';
+import { File as MulterFile } from 'multer';
+
 interface GroupData {
-    groupName: string;
-    position?: number;
-    file?: {
-        path: string;
-        type: string;
-    };
-    imageData?: string;
+  groupName: string;
+  imageData?: string;
+  file?: MulterFile;
+  position?: string;
 }
 
 interface UploadData {
-    url: string;
+  url: string;
 }
 
-export default function Groups() {
-    const allowedTypes: string[] = ['image/png', 'image/jpeg', 'image/bmp'];
+interface Groups {
+  setGroupField(groupName: string, field: string, value: string): Promise<void>;
+  getGroupFields(groupName: string, fields: string[]): Promise<Record<string, string>>;
+  updateCoverPosition(groupName: string, position: string): Promise<void>;
+  updateCover(uid: number, data: GroupData): Promise<{ url: string }>;
+  removeCover(data: GroupData): Promise<void>;
+}
 
-    const updateCoverPosition = async function (groupName: string, position: number): Promise<void> {
-        if (!groupName) {
-            throw new Error('[[error:invalid-data]]');
-        }
-        await setGroupField(groupName, 'cover:position', position);
-    };
+export default function (Groups: Groups) {
+  const allowedTypes = ['image/png', 'image/jpeg', 'image/bmp'];
 
-    const updateCover = async function (uid: string, data: GroupData): Promise<UploadData> {
-        let tempPath = data.file ? data.file.path : '';
-        try {
-            // Position only? That's fine
-            if (!data.imageData && !data.file && data.position) {
-              await updateCoverPosition(data.groupName, data.position);
-              return;
-            }
-            const type = data.file ? data.file.type : image.mimeFromBase64(data.imageData);
-            if (!type || !allowedTypes.includes(type)) {
-              throw new Error('[[error:invalid-image]]');
-            }
+  Groups.updateCoverPosition = async function (groupName: string, position: string): Promise<void> {
+    if (!groupName) {
+      throw new Error('[[error:invalid-data]]');
+    }
+    await Groups.setGroupField(groupName, 'cover:position', position);
+  };
 
-            if (!tempPath) {
-              tempPath = await image.writeImageDataToTempFile(data.imageData);
-            }
+  Groups.updateCover = async function (uid: number, data: GroupData): Promise<{ url: string }> {
+    let tempPath = data.file ? data.file.path : '';
+    try {
+      if (!data.imageData && !data.file && data.position) {
+        await Groups.updateCoverPosition(data.groupName, data.position);
+        return { url: '' }; // Return a default or placeholder URL
+      }
 
-            const filename = `groupCover-${data.groupName}${path.extname(tempPath)}`;
-            const uploadData = await image.uploadImage(filename, 'files', {
-                path: tempPath,
-                uid: uid,
-                name: 'groupCover',
-            });
-            const { url } = uploadData;
-            await setGroupField(data.groupName, 'cover:url', url);
+      const type = data.file ? data.file.mimetype : image.mimeFromBase64(data.imageData);
+      if (!type || !allowedTypes.includes(type)) {
+        throw new Error('[[error:invalid-image]]');
+      }
 
-            await image.resizeImage({
-                path: tempPath,
-                width: 358,
-            });
-            const thumbUploadData = await image.uploadImage(`groupCoverThumb-${data.groupName}${path.extname(tempPath)}`, 'files', {
-                path: tempPath,
-                uid: uid,
-                name: 'groupCover',
-            });
-            await setGroupField(data.groupName, 'cover:thumb:url', thumbUploadData.url);
+      if (!tempPath) {
+        tempPath = await image.writeImageDataToTempFile(data.imageData);
+      }
 
-            if (data.position) {
-                await updateCoverPosition(data.groupName, data.position);
-            }
+      const filename = `groupCover-${data.groupName}${path.extname(tempPath)}`;
+      const uploadData: UploadData = await image.uploadImage(filename, 'files', {
+        path: tempPath,
+        uid,
+        name: 'groupCover',
+      });
 
-            return { url };
-        } finally {
-            file.delete(tempPath);
-        }
-    };
+      await Groups.setGroupField(data.groupName, 'cover:url', uploadData.url);
 
-    const removeCover = async function (data: { groupName: string }): Promise<void> {
-        const fields = ['cover:url', 'cover:thumb:url'];
-        const values = await getGroupFields(data.groupName, fields);
-        await Promise.all(fields.map((field) => {
-            if (!values[field] || !values[field].startsWith(`${nconf.get('relative_path')}/assets/uploads/files/`)) {
-                return;
-            }
-            const filename = values[field].split('/').pop();
-            const filePath = path.join(nconf.get('upload_path'), 'files', filename);
-            return file.delete(filePath);
-        }));
+      await image.resizeImage({
+        path: tempPath,
+        width: 358,
+      });
 
-        await db.deleteObjectFields(`group:${data.groupName}`, ['cover:url', 'cover:thumb:url', 'cover:position']);
-    };
+      const thumbUploadData: UploadData = await image.uploadImage(`groupCoverThumb-${data.groupName}${path.extname(tempPath)}`, 'files', {
+        path: tempPath,
+        uid,
+        name: 'groupCover',
+      });
 
-    const setGroupField = async function (groupName: string, field: string, value: any): Promise<void> {
-        // Implement your logic here
-    };
+      await Groups.setGroupField(data.groupName, 'cover:thumb:url', thumbUploadData.url);
 
-    const getGroupFields = async function (groupName: string, fields: string[]): Promise<any> {
-        // Implement your logic here
-    };
+      if (data.position) {
+        await Groups.updateCoverPosition(data.groupName, data.position);
+      }
 
-    return {
-        updateCoverPosition,
-        updateCover,
-        removeCover,
-    };
+      return { url: uploadData.url };
+    } finally {
+      if (tempPath) {
+        file.delete(tempPath);
+      }
+    }
+  };
+
+  Groups.removeCover = async function (data: GroupData): Promise<void> {
+    const fields = ['cover:url', 'cover:thumb:url'];
+    const values = await Groups.getGroupFields(data.groupName, fields);
+
+    await Promise.all(fields.map(async (field) => {
+      if (values[field] && values[field].startsWith(`${nconf.get('relative_path')}/assets/uploads/files/`)) {
+        const filename = values[field].split('/').pop() || '';
+        const filePath = path.join(nconf.get('upload_path'), 'files', filename);
+        await file.delete(filePath);
+      }
+    }));
+
+    await db.deleteObjectFields(`group:${data.groupName}`, ['cover:url', 'cover:thumb:url', 'cover:position']);
+  };
 }
