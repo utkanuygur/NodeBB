@@ -1,4 +1,3 @@
-import { File as MulterFile } from 'multer';
 import * as path from 'path';
 import * as nconf from 'nconf';
 import * as db from '../database';
