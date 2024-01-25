@@ -1,9 +1,8 @@
-import path from 'path';
-import nconf from 'nconf';
-import db from '../database';
-import image from '../image';
-import file from '../file';
-
+const path = require('path');
+const nconf = require('nconf');
+const db = require('../database');
+const image = require('../image');
+const file = require('../file');
 interface GroupData {
     groupName: string;
     position?: number;

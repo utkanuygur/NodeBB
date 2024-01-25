@@ -8,15 +8,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-const path_1 = __importDefault(require("path"));
-const nconf_1 = __importDefault(require("nconf"));
-const database_1 = __importDefault(require("../database"));
-const image_1 = __importDefault(require("../image"));
-const file_1 = __importDefault(require("../file"));
+const path = require('path');
+const nconf = require('nconf');
+const db = require('../database');
+const image = require('../image');
+const file = require('../file');
 function Groups() {
     const allowedTypes = ['image/png', 'image/jpeg', 'image/bmp'];
     const updateCoverPosition = function (groupName, position) {
@@ -36,26 +33,26 @@ function Groups() {
                     yield updateCoverPosition(data.groupName, data.position);
                     return;
                 }
-                const type = data.file ? data.file.type : image_1.default.mimeFromBase64(data.imageData);
+                const type = data.file ? data.file.type : image.mimeFromBase64(data.imageData);
                 if (!type || !allowedTypes.includes(type)) {
                     throw new Error('[[error:invalid-image]]');
                 }
                 if (!tempPath) {
-                    tempPath = yield image_1.default.writeImageDataToTempFile(data.imageData);
+                    tempPath = yield image.writeImageDataToTempFile(data.imageData);
                 }
-                const filename = `groupCover-${data.groupName}${path_1.default.extname(tempPath)}`;
-                const uploadData = yield image_1.default.uploadImage(filename, 'files', {
+                const filename = `groupCover-${data.groupName}${path.extname(tempPath)}`;
+                const uploadData = yield image.uploadImage(filename, 'files', {
                     path: tempPath,
                     uid: uid,
                     name: 'groupCover',
                 });
                 const { url } = uploadData;
                 yield setGroupField(data.groupName, 'cover:url', url);
-                yield image_1.default.resizeImage({
+                yield image.resizeImage({
                     path: tempPath,
                     width: 358,
                 });
-                const thumbUploadData = yield image_1.default.uploadImage(`groupCoverThumb-${data.groupName}${path_1.default.extname(tempPath)}`, 'files', {
+                const thumbUploadData = yield image.uploadImage(`groupCoverThumb-${data.groupName}${path.extname(tempPath)}`, 'files', {
                     path: tempPath,
                     uid: uid,
                     name: 'groupCover',
@@ -67,7 +64,7 @@ function Groups() {
                 return { url };
             }
             finally {
-                file_1.default.delete(tempPath);
+                file.delete(tempPath);
             }
         });
     };
@@ -76,14 +73,14 @@ function Groups() {
             const fields = ['cover:url', 'cover:thumb:url'];
             const values = yield getGroupFields(data.groupName, fields);
             yield Promise.all(fields.map((field) => {
-                if (!values[field] || !values[field].startsWith(`${nconf_1.default.get('relative_path')}/assets/uploads/files/`)) {
+                if (!values[field] || !values[field].startsWith(`${nconf.get('relative_path')}/assets/uploads/files/`)) {
                     return;
                 }
                 const filename = values[field].split('/').pop();
-                const filePath = path_1.default.join(nconf_1.default.get('upload_path'), 'files', filename);
-                return file_1.default.delete(filePath);
+                const filePath = path.join(nconf.get('upload_path'), 'files', filename);
+                return file.delete(filePath);
             }));
-            yield database_1.default.deleteObjectFields(`group:${data.groupName}`, ['cover:url', 'cover:thumb:url', 'cover:position']);
+            yield db.deleteObjectFields(`group:${data.groupName}`, ['cover:url', 'cover:thumb:url', 'cover:position']);
         });
     };
     const setGroupField = function (groupName, field, value) {
