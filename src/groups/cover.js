@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -48,6 +48,7 @@ function default_1(Groups) {
         });
     };
     Groups.updateCover = function (uid, data) {
+        var _a, _b;
         return __awaiter(this, void 0, void 0, function* () {
             let tempPath = data.file ? data.file.path : '';
             try {
@@ -55,7 +56,9 @@ function default_1(Groups) {
                     yield Groups.updateCoverPosition(data.groupName, data.position);
                     return { url: '' }; // Return a default or placeholder URL
                 }
-                const type = data.file ? data.file.mimetype : image.mimeFromBase64(data.imageData);
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+                const s = image.mimeFromBase64(data.imageData);
+                const type = (_b = (_a = data.file) === null || _a === void 0 ? void 0 : _a.mimetype) !== null && _b !== void 0 ? _b : s;
                 if (!type || !allowedTypes.includes(type)) {
                     throw new Error('[[error:invalid-image]]');
                 }
@@ -63,6 +66,7 @@ function default_1(Groups) {
                     tempPath = yield image.writeImageDataToTempFile(data.imageData);
                 }
                 const filename = `groupCover-${data.groupName}${path.extname(tempPath)}`;
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                 const uploadData = yield image.uploadImage(filename, 'files', {
                     path: tempPath,
                     uid,
@@ -73,6 +77,7 @@ function default_1(Groups) {
                     path: tempPath,
                     width: 358,
                 });
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                 const thumbUploadData = yield image.uploadImage(`groupCoverThumb-${data.groupName}${path.extname(tempPath)}`, 'files', {
                     path: tempPath,
                     uid,
@@ -84,9 +89,11 @@ function default_1(Groups) {
                 }
                 return { url: uploadData.url };
             }
+            catch (_c) {
+            }
             finally {
                 if (tempPath) {
-                    file.delete(tempPath);
+                    yield file.delete(tempPath);
                 }
             }
         });
@@ -96,13 +103,23 @@ function default_1(Groups) {
             const fields = ['cover:url', 'cover:thumb:url'];
             const values = yield Groups.getGroupFields(data.groupName, fields);
             yield Promise.all(fields.map((field) => __awaiter(this, void 0, void 0, function* () {
-                if (values[field] && values[field].startsWith(`${nconf.get('relative_path')}/assets/uploads/files/`)) {
+                if (values[field] &&
+                    values[field].startsWith(
+                    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+                    `${nconf.get('relative_path')}/assets/uploads/files/`)) {
                     const filename = values[field].split('/').pop() || '';
-                    const filePath = path.join(nconf.get('upload_path'), 'files', filename);
+                    const filePath = path.join(
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+                    nconf.get('upload_path'), 'files', filename);
                     yield file.delete(filePath);
                 }
             })));
-            yield db.deleteObjectFields(`group:${data.groupName}`, ['cover:url', 'cover:thumb:url', 'cover:position']);
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+            yield db.deleteObjectFields(`group:${data.groupName}`, [
+                'cover:url',
+                'cover:thumb:url',
+                'cover:position',
+            ]);
         });
     };
 }
