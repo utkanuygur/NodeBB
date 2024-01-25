@@ -92,7 +92,6 @@ module.exports = function (Groups) {
                 await file.delete(filePath).catch(e => console.error('Failed to delete file:', e));
             }
         });
-
         await Promise.all(deletePromises);
 
         await db.deleteObjectFields(`group:${data.groupName}`, ['cover:url', 'cover:thumb:url', 'cover:position']);
