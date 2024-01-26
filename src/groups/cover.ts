@@ -1,3 +1,4 @@
+'use strict';
 import path from 'path';
 import nconf from 'nconf';
 import db from '../database';
