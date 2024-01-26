@@ -1,8 +1,8 @@
-import * as path from 'path';
-import * as nconf from 'nconf';
-import * as db from '../database';
-import * as image from '../image';
-import * as file from '../file';
+import path from 'path';
+import nconf from 'nconf';
+import db from '../database';
+import image from '../image';
+import file from '../file';
 
 interface GroupData {
   groupName: string;
